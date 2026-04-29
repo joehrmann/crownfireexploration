@@ -27,6 +27,34 @@
             margin: 0 0 10px 0;
             font-size: 16px;
             color: #333;
+            text-align: center;
+        }
+        #menu hr {
+            border: 0; 
+            border-top: 1px solid #ccc; 
+            margin: 10px 0;
+        }
+        #menu-content {
+            /* Set a max-height taller than your content will ever be */
+            max-height: 500px; 
+            overflow: hidden;
+            transition: max-height 0.3s ease-in-out;
+        }
+        #menu-content.collapsed {
+            max-height: 0;
+        }
+        #menu-toggle-btn {
+            text-align: center;
+            cursor: pointer;
+            margin-top: 5px;
+            padding-top: 5px;
+            font-size: 14px;
+            color: #666;
+            border-top: 1px solid #eee;
+            transition: color 0.2s;
+        }
+        #menu-toggle-btn:hover {
+            color: #000;
         }
         .layer-toggle {
             display: block;
@@ -48,34 +76,48 @@
 
 <div id="menu">
     <h3>Settings</h3>
-    <label class="layer-toggle">
-        <input type="checkbox" id="toggle-3d" checked> 3D Mode
-    </label>
-    
-    <hr style="border: 0; border-top: 1px solid #ccc; margin: 10px 0;">
+    <div id="menu-content">
+        <label class="layer-toggle">
+            <input type="checkbox" id="toggle-3d" checked> 3D Mode
+        </label>
+        
+        <hr style="border: 0; border-top: 1px solid #ccc; margin: 10px 0;">
 
-    <label class="layer-toggle">
-    
-        <input type="checkbox" id="toggle-severity" checked> Severity Overlay
-    </label>
-    <label class="layer-toggle">
-        <input type="checkbox" id="toggle-type" checked> Type Overlay
-    </label>
-    <label class="layer-toggle">
-        <input type="checkbox" id="toggle-boundary" checked> Boundary Layer
-    </label>
+        <h3 style="font-size: 14px; margin: 5px 0; text-align: left;">Fire layer</h3>
+        
+        <label class="layer-toggle">
+            <input type="radio" name="overlay-switch" value="type" checked> Fire type
+        </label>
+        <label class="layer-toggle">
+            <input type="radio" name="overlay-switch" value="severity"> Fire severity
+        </label>
+        <label class="layer-toggle">
+            <input type="radio" name="overlay-switch" value="none"> None
+        </label>
 
-    <label class="layer-toggle" id="label-hillshade">
-        <input type="checkbox" id="toggle-hillshade" checked> Hillshade Layer
-    </label>
+        <div id="legend-container" style="margin-top: 10px; text-align: center;">
+            <img id="legend-img" src="./data/type_legend.png" alt="Map Legend" style="max-width: 100%; border-radius: 4px; border: 1px solid #ddd; display: block;">
+        </div>
 
-    <hr style="border: 0; border-top: 1px solid #ccc; margin: 10px 0;">
+        <hr style="border: 0; border-top: 1px solid #ccc; margin: 10px 0;">
+
+        <label class="layer-toggle">
+            <input type="checkbox" id="toggle-boundary" checked> Firearea
+        </label>
+
+        <label class="layer-toggle" id="label-hillshade">
+            <input type="checkbox" id="toggle-hillshade" checked> Hillshade
+        </label>
+<!-- <h3>Understory metrics</h3>
+        <hr style="border: 0; border-top: 1px solid #ccc; margin: 10px 0;">
+        
+        
+        <label class="layer-toggle">
+            <input type="checkbox" id="toggle-lad" checked> LAD < 3m
+        </label> -->
     
-    <h3>Leaf Area Density (LAD)</h3>
-    <label class="layer-toggle">
-        <input type="checkbox" id="toggle-lad" checked> LAD < 3m
-    </label>
-   
+    </div>
+    <div id="menu-toggle-btn" title="Collapse/Expand Menu">▲</div>
 
 </div>
 
@@ -153,6 +195,9 @@
             id: 'layer-severity',
             type: 'raster',
             source: 'severity-img',
+            layout: {
+                'visibility': 'none' // Hide this on load so it doesn't mix with Severity!
+            },
             paint: { 'raster-opacity': 0.9 }
         });
 
@@ -169,7 +214,7 @@
             paint: { 'raster-opacity': 0.9 }
         });
 
-        map.addSource('lad-data', {
+        /* map.addSource('lad-data', {
             type: 'geojson',
             data: './data/lad.geojson'
         });
@@ -228,7 +273,7 @@
                 'circle-blur': 0.2
             }
         });
-
+ */
 
         // --- ADD GEOJSON BOUNDARY ---
         map.addSource('boundary-data', {
@@ -265,8 +310,34 @@
     };
 
     // Bind checkboxes to map layers
-    toggleLayer('toggle-severity', 'layer-severity');
-    toggleLayer('toggle-type', 'layer-type');
+    const overlayRadios = document.querySelectorAll('input[name="overlay-switch"]');
+    const legendImg = document.getElementById('legend-img');
+
+    overlayRadios.forEach(radio => {
+        radio.addEventListener('change', (e) => {
+            const selectedOverlay = e.target.value;
+            
+            // 1. Turn both map layers off first to reset
+            if (map.getLayer('layer-severity')) map.setLayoutProperty('layer-severity', 'visibility', 'none');
+            if (map.getLayer('layer-type')) map.setLayoutProperty('layer-type', 'visibility', 'none');
+            
+            // 2. Turn on the selected layer and update the legend picture
+            if (selectedOverlay === 'severity') {
+                if (map.getLayer('layer-severity')) map.setLayoutProperty('layer-severity', 'visibility', 'visible');
+                legendImg.src = './data/severity_legend.png'; // Ensure this matches your file name
+                legendImg.style.display = 'block'; // Show the image
+                
+            } else if (selectedOverlay === 'type') {
+                if (map.getLayer('layer-type')) map.setLayoutProperty('layer-type', 'visibility', 'visible');
+                legendImg.src = './data/type_legend.png'; // Ensure this matches your file name
+                legendImg.style.display = 'block'; // Show the image
+                
+            } else {
+                // If "None" is selected, just hide the legend entirely
+                legendImg.style.display = 'none';
+            }
+        });
+    });
     toggleLayer('toggle-boundary', 'layer-boundary');
 toggleLayer('toggle-hillshade', 'layer-hillshade');
 
@@ -359,7 +430,7 @@ let lastPitch = 60;
 
 
 // 1. Checkbox Toggle
-    document.getElementById('toggle-lad').addEventListener('change', (e) => {
+   /*  document.getElementById('toggle-lad').addEventListener('change', (e) => {
         const isLadVisible = e.target.checked;
         const is3DMode = document.getElementById('toggle-3d').checked; // Check 3D state
         
@@ -375,6 +446,25 @@ let lastPitch = 60;
             // Turn both off
             if (map.getLayer('layer-lad')) map.setLayoutProperty('layer-lad', 'visibility', 'none');
             if (map.getLayer('layer-lad-2d')) map.setLayoutProperty('layer-lad-2d', 'visibility', 'none');
+        }
+    }); */
+
+    const menuContent = document.getElementById('menu-content');
+    const menuToggleBtn = document.getElementById('menu-toggle-btn');
+    let isMenuCollapsed = false;
+
+    menuToggleBtn.addEventListener('click', () => {
+        isMenuCollapsed = !isMenuCollapsed;
+        
+        if (isMenuCollapsed) {
+            menuContent.classList.add('collapsed');
+            menuToggleBtn.innerHTML = '▼'; // Down arrow when collapsed
+            // Optional: Remove bottom margin from h3 when collapsed so it looks perfectly neat
+            document.querySelector('#menu h3').style.marginBottom = '0';
+        } else {
+            menuContent.classList.remove('collapsed');
+            menuToggleBtn.innerHTML = '▲'; // Up arrow when expanded
+            document.querySelector('#menu h3').style.marginBottom = '10px';
         }
     });
    
